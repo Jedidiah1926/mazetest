@@ -801,6 +801,7 @@ function resizeCanvas() {
 
 function requestGamePointerLock() {
   if (!gameStarted || isInputBlockedByPanel() || document.pointerLockElement === canvas) return;
+  if (showCraft || mapOpen || inventoryOpen) return; // 오버레이 열려있으면 락 금지
 
   try {
     const result = canvas.requestPointerLock();
@@ -2139,6 +2140,8 @@ function interact() {
     }
 
     showCraft = !showCraft;
+    if (showCraft && document.pointerLockElement === canvas) document.exitPointerLock();
+    else if (!showCraft) resetTechTreeState();
     return;
   }
 
@@ -4837,7 +4840,12 @@ window.addEventListener("keydown", (e) => {
   if (matchesControl("craft", e.code)) {
     showCraft = !showCraft;
     inventoryOpen = false;
-    if (!showCraft) resetTechTreeState();
+    if (showCraft) {
+      // 테크트리 열 때 포인터 락 해제 → 커서 자유롭게
+      if (document.pointerLockElement === canvas) document.exitPointerLock();
+    } else {
+      resetTechTreeState();
+    }
     return;
   }
 
