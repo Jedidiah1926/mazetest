@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MTA - Three.js</title>
-  <link rel="stylesheet" href="style.css?v=74">
+  <link rel="stylesheet" href="style.css?v=75">
 </head>
 <body>
   <canvas id="game"></canvas>
@@ -20,7 +20,7 @@
       <button id="startBtn">문 앞에 서기</button>
       <div class="help">
         WASD 이동 / 마우스 상하좌우 시점 / Shift 달리기<br>
-        E 문 열기·닫기·상호작용 / M 지도 / C 제작 / R 미로 변경 / ESC 설정 / = 디버그<br>
+        E 문 열기·닫기·상호작용 / M 지도 / C 제작 / T 횃불 빠른 제작 / R 미로 변경 / ESC 설정 / = 디버그<br>
         기력·정신력·횃불·빛 관리 / 기본 재료로 제작 기술부터 연구
       </div>
     </div>
@@ -45,6 +45,7 @@
           <button class="bind-key" data-action="map" type="button"><span>지도</span><strong></strong></button>
           <button class="bind-key" data-action="craft" type="button"><span>작업대</span><strong></strong></button>
           <button class="bind-key" data-action="reroll" type="button"><span>미로 변경</span><strong></strong></button>
+          <button class="bind-key" data-action="quickTorch" type="button"><span>횃불 빠른 제작</span><strong></strong></button>
         </div>
       </div>
 
@@ -115,6 +116,6 @@
       document.write('<script src="https://unpkg.com/three@0.128.0/build/three.min.js"><\/script>');
     }
   </script>
-  <script src="script.js?v=74"></script>
+  <script src="script.js?v=75"></script>
 </body>
 </html>
