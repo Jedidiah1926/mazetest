@@ -155,7 +155,8 @@ const DEFAULT_CONTROLS = {
   interact: "KeyE",
   map: "KeyM",
   craft: "KeyC",
-  reroll: "KeyR"
+  reroll: "KeyR",
+  quickTorch: "KeyT"
 };
 
 const CONTROL_FALLBACKS = {
@@ -167,7 +168,8 @@ const CONTROL_FALLBACKS = {
   interact: ["KeyE"],
   map: ["KeyM"],
   craft: ["KeyC"],
-  reroll: ["KeyR"]
+  reroll: ["KeyR"],
+  quickTorch: ["KeyT"]
 };
 
 function getControlCode(action) {
@@ -4863,6 +4865,18 @@ window.addEventListener("keydown", (e) => {
     return;
   }
 
+  // T 키 — 횃불 빠른 제작 (제작 기술 Lv1 해금 시 사용 가능)
+  if (matchesControl("quickTorch", e.code)) {
+    if (isCraftUnlocked("torchUse")) {
+      craft("torchUse");
+    } else if (getCraftTechLevel() < 1) {
+      showMessage("제작 기술 Lv1을 먼저 연구해야 합니다.");
+    } else {
+      showMessage("횃불이 이미 가득 찼습니다.");
+    }
+    return;
+  }
+
   if (showCraft && craftHotkeys[e.code]) {
     craft(craftHotkeys[e.code]);
     return;
@@ -4896,10 +4910,8 @@ window.addEventListener("mousemove", (e) => {
 
   if (showCraft) {
     const rect = hudCanvas.getBoundingClientRect();
-    const scaleX = hudCanvas.width / rect.width;
-    const scaleY = hudCanvas.height / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
     techTreeMousePos = { x: mx, y: my };
 
     if (techTreeDrag) {
@@ -4916,7 +4928,7 @@ window.addEventListener("mousemove", (e) => {
       const nodes = buildTechTree();
       const ox = techTreeScroll.x, oy = techTreeScroll.y;
       const hit = techTreeHitNode(mx, my, nodes, ox, oy);
-      const onClose = techTreeHitClose(mx, my, hudCanvas.width);
+      const onClose = techTreeHitClose(mx, my, rect.width);
       techTreeHover = hit ? hit.id : null;
       hudCanvas.style.cursor = (hit || onClose) ? "pointer" : "default";
     }
@@ -4927,10 +4939,8 @@ window.addEventListener("mousedown", (e) => {
   if (!showCraft) return;
   if (e.button !== 0) return; // 왼쪽 버튼만
   const rect = hudCanvas.getBoundingClientRect();
-  const scaleX = hudCanvas.width / rect.width;
-  const scaleY = hudCanvas.height / rect.height;
-  const mx = (e.clientX - rect.left) * scaleX;
-  const my = (e.clientY - rect.top) * scaleY;
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
   // 헤더(34px) 아래에서만 드래그 스크롤
   techTreeDrag = { x: mx, y: my, inContent: my > 34, startX: mx, startY: my };
   e.preventDefault();
@@ -4940,17 +4950,15 @@ window.addEventListener("mousedown", (e) => {
 window.addEventListener("mouseup", (e) => {
   if (!showCraft || !techTreeDrag) { techTreeDrag = null; return; }
   const rect = hudCanvas.getBoundingClientRect();
-  const scaleX = hudCanvas.width / rect.width;
-  const scaleY = hudCanvas.height / rect.height;
-  const mx = (e.clientX - rect.left) * scaleX;
-  const my = (e.clientY - rect.top) * scaleY;
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
   const dist = Math.abs(mx - techTreeDrag.startX) + Math.abs(my - techTreeDrag.startY);
   const wasContent = techTreeDrag.inContent;
   techTreeDrag = null;
 
   if (dist < 6) {
     // 닫기 버튼
-    if (techTreeHitClose(mx, my, hudCanvas.width)) {
+    if (techTreeHitClose(mx, my, rect.width)) {
       closeCraftTree();
       return;
     }
