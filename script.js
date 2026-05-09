@@ -455,6 +455,19 @@ function resetTechTreeState() {
   hudCanvas.style.cursor = "default";
 }
 
+function openCraftTree() {
+  showCraft = true;
+  inventoryOpen = false;
+  hudCanvas.style.pointerEvents = "auto"; // 마우스 이벤트 활성화
+  if (document.pointerLockElement === canvas) document.exitPointerLock();
+}
+
+function closeCraftTree() {
+  showCraft = false;
+  hudCanvas.style.pointerEvents = "none"; // 마우스 이벤트 비활성화
+  resetTechTreeState();
+}
+
 // ── 시각 연출 ──────────────────────────────────────────────────────────────
 let screenFade = 0;
 let screenFadeTarget = 0;
@@ -1161,7 +1174,7 @@ function openSettings() {
   SFX.menuOpen();
   settingsOpen = true;
   mapOpen = false;
-  showCraft = false;
+  closeCraftTree();
   inventoryOpen = false;
   gathering = null;
   bindingAction = null;
@@ -1193,7 +1206,7 @@ function resetGameProgress() {
   day = getStoredDay();
   mazeSeed = getDailySeed(day);
   mapOpen = false;
-  showCraft = false;
+  closeCraftTree();
   inventoryOpen = false;
   gathering = null;
   stamina = staminaMax;
@@ -1236,7 +1249,7 @@ function openTestPanel() {
 
   testOpen = true;
   mapOpen = false;
-  showCraft = false;
+  closeCraftTree();
   gathering = null;
   testPanel.classList.remove("hidden");
   syncTestPanel();
@@ -1647,7 +1660,7 @@ function generateTutorialRoom() {
   tutorialDoorKey = "";
   tutorialExitDoorKey = "";
   mapOpen = false;
-  showCraft = false;
+  closeCraftTree();
   inventoryOpen = false;
   gathering = null;
   screenFade = 0;
@@ -2139,9 +2152,7 @@ function interact() {
       return;
     }
 
-    showCraft = !showCraft;
-    if (showCraft && document.pointerLockElement === canvas) document.exitPointerLock();
-    else if (!showCraft) resetTechTreeState();
+    if (showCraft) closeCraftTree(); else openCraftTree();
     return;
   }
 
@@ -2652,7 +2663,7 @@ function updateSurvivalSystems() {
 function triggerGameOver() {
   if (gameOver) return;
   gameOver = true;
-  showCraft = false;
+  closeCraftTree();
   mapOpen = false;
   gathering = null;
   for (const code of Object.keys(keys)) keys[code] = false;
@@ -4682,7 +4693,7 @@ startBtn.addEventListener("click", () => {
     testOpen = false;
     testPanel.classList.add("hidden");
     mapOpen = false;
-    showCraft = false;
+    closeCraftTree();
     inventoryOpen = false;
     gathering = null;
 
@@ -4816,7 +4827,7 @@ window.addEventListener("keydown", (e) => {
 
   if (e.code === "KeyI") {
     inventoryOpen = !inventoryOpen;
-    showCraft = false;
+    closeCraftTree();
     mapOpen = false;
     return;
   }
@@ -4838,14 +4849,7 @@ window.addEventListener("keydown", (e) => {
   }
 
   if (matchesControl("craft", e.code)) {
-    showCraft = !showCraft;
-    inventoryOpen = false;
-    if (showCraft) {
-      // 테크트리 열 때 포인터 락 해제 → 커서 자유롭게
-      if (document.pointerLockElement === canvas) document.exitPointerLock();
-    } else {
-      resetTechTreeState();
-    }
+    if (showCraft) closeCraftTree(); else openCraftTree();
     return;
   }
 
@@ -4933,8 +4937,7 @@ window.addEventListener("mouseup", (e) => {
   if (dist < 6) {
     // 닫기 버튼
     if (techTreeHitClose(mx, my, hudCanvas.width)) {
-      showCraft = false;
-      resetTechTreeState();
+      closeCraftTree();
       return;
     }
     // 노드 클릭
