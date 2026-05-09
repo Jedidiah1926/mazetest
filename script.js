@@ -302,6 +302,7 @@ const CRAFT_COSTS = {
     { wood: 3, coal: 3, crystal: 2 }
   ],
   torchUse: { wood: 1, coal: 1 },
+  torchUnlock: { wood: 2, coal: 1 },
   lantern: [
     { wood: 2, crystal: 2, coal: 2 },
     { crystal: 3, coal: 4 }
@@ -429,6 +430,7 @@ let crafted = {
   workbenchLevel: 0,
   portableWorkbench: 0,
   craftTech: 0,
+  torchUnlocked: false,
   torchLevel: 0,
   machineWorkbench: false,
   machineUpgrade: 0,
@@ -1074,6 +1076,7 @@ function normalizeCraftedProgress() {
 
   crafted.craftTech = clamp(Number(crafted.craftTech) || 0, 0, CRAFT_COSTS.craftTech.length);
   crafted.torchLevel = clamp(Number(crafted.torchLevel) || 0, 0, CRAFT_COSTS.torch.length);
+  crafted.torchUnlocked = crafted.torchUnlocked === true || crafted.torchLevel > 0;
   torchPower = clamp(Number(torchPower) || 0, 0, getTorchMax());
   lightPower = clamp(Number(lightPower) || 0, 0, getLightMax());
   crafted.machineWorkbench = crafted.machineWorkbench === true;
@@ -1127,7 +1130,7 @@ function loadProgress() {
     collectedResources = {};
     exploredTiles = {};
     doorStates = {};
-    crafted = { boots: 0, lantern: false, lanternLevel: 0, map: true, marker: 0, workbench: false, workbenchLevel: 0, portableWorkbench: 0, craftTech: 0, torchLevel: 0, machineWorkbench: false, machineUpgrade: 0, machineMaxUpgrade: 0, machineRecoveryUpgrade: 0, manualCrafter: 0, restStone: 0, potionWorkbench: 0, basicSanityPotion: 0, manualExtractor: 0, mysteryDevice: 0 };
+    crafted = { boots: 0, lantern: false, lanternLevel: 0, map: true, marker: 0, workbench: false, workbenchLevel: 0, portableWorkbench: 0, craftTech: 0, torchUnlocked: false, torchLevel: 0, machineWorkbench: false, machineUpgrade: 0, machineMaxUpgrade: 0, machineRecoveryUpgrade: 0, manualCrafter: 0, restStone: 0, potionWorkbench: 0, basicSanityPotion: 0, manualExtractor: 0, mysteryDevice: 0 };
   }
 }
 
@@ -1234,7 +1237,7 @@ function resetGameProgress() {
   collectedResources = {};
   exploredTiles = {};
   doorStates = {};
-  crafted = { boots: 0, lantern: false, lanternLevel: 0, map: true, marker: 0, workbench: false, workbenchLevel: 0, portableWorkbench: 0, craftTech: 0, torchLevel: 0, machineWorkbench: false, machineUpgrade: 0, machineMaxUpgrade: 0, machineRecoveryUpgrade: 0, manualCrafter: 0, restStone: 0, potionWorkbench: 0, basicSanityPotion: 0, manualExtractor: 0, mysteryDevice: 0 };
+  crafted = { boots: 0, lantern: false, lanternLevel: 0, map: true, marker: 0, workbench: false, workbenchLevel: 0, portableWorkbench: 0, craftTech: 0, torchUnlocked: false, torchLevel: 0, machineWorkbench: false, machineUpgrade: 0, machineMaxUpgrade: 0, machineRecoveryUpgrade: 0, manualCrafter: 0, restStone: 0, potionWorkbench: 0, basicSanityPotion: 0, manualExtractor: 0, mysteryDevice: 0 };
 
   generateMaze();
   saveProgress();
@@ -2330,8 +2333,9 @@ function isCraftUnlocked(item) {
   const workbenchLevel = getWorkbenchLevel();
 
   if (item === "craftTech") return techLevel < CRAFT_COSTS.craftTech.length;
-  if (item === "torchUse") return techLevel >= 1 && torchPower < getTorchMax();
-  if (item === "torch") return techLevel >= 1 && torchLevel < CRAFT_COSTS.torch.length;
+  if (item === "torchUnlock") return techLevel >= 1 && crafted.torchUnlocked !== true;
+  if (item === "torchUse") return crafted.torchUnlocked === true && torchPower < getTorchMax();
+  if (item === "torch") return crafted.torchUnlocked === true && torchLevel < CRAFT_COSTS.torch.length;
 
   if (item === "workbench") return techLevel >= 2 && workbenchLevel < CRAFT_COSTS.workbench.length;
   if (item === "machineWorkbench") return workbenchLevel >= 1 && crafted.machineWorkbench !== true;
@@ -2345,7 +2349,7 @@ function isCraftUnlocked(item) {
   if (item === "mysteryDevice") return techLevel >= 5 && getManualExtractorLevel() >= 1 && getMysteryDeviceLevel() < CRAFT_COSTS.mysteryDevice.length;
   if (item === "lantern") return techLevel >= 3 && lanternLevel < CRAFT_COSTS.lantern.length;
   if (item === "boots") return techLevel >= 3 && workbenchLevel >= 1;
-  if (item === "marker") return techLevel >= 3 && workbenchLevel >= 1 && crafted.map;
+  if (item === "marker") return techLevel >= 3 && crafted.map;
 
   if (item === "portableWorkbench") return false;
   if (item === "machineUpgrade") return false;
@@ -2362,6 +2366,7 @@ function getCostForCraftItem(item) {
   if (item === "workbench") return CRAFT_COSTS.workbench[workbenchLevel];
   if (item === "torch") return CRAFT_COSTS.torch[torchLevel];
   if (item === "torchUse") return CRAFT_COSTS.torchUse;
+  if (item === "torchUnlock") return CRAFT_COSTS.torchUnlock;
   if (item === "lantern") return CRAFT_COSTS.lantern[lanternLevel];
   if (item === "machineWorkbench") return CRAFT_COSTS.machineWorkbench[0];
   if (item === "machineMaxUpgrade") return CRAFT_COSTS.machineMaxUpgrade[getMachineMaxUpgradeLevel()];
@@ -2434,6 +2439,16 @@ function craft(item) {
     torchPower = clamp(torchPower, 0, getTorchMax());
     saveProgress();
     showMessage(`횃불 업그레이드 ${crafted.torchLevel} 완료`);
+    return;
+  }
+
+  if (item === "torchUnlock") {
+    crafted.torchUnlocked = true;
+    // 즉시 첫 횃불도 같이 받음
+    const maxTorch = getTorchMax();
+    torchPower = maxTorch;
+    saveProgress();
+    showMessage("횃불 제작 해금! 횃불 1개를 받았습니다.");
     return;
   }
 
@@ -3746,6 +3761,38 @@ function drawHUD(w, h) {
     ctx.fillText("◈ 중앙 기지", x0 + 8, y0 - 11);
     ctx.restore();
   }
+
+  // 횃불 빠른 제작 힌트 (해금 시에만)
+  if (crafted.torchUnlocked === true) {
+    const hintX = x0 + panelW + 12;
+    const hintY = y0 + panelH - 32;
+    const hintW = 132, hintH = 26;
+    const canMake = isCraftUnlocked("torchUse") && hasMaterials(CRAFT_COSTS.torchUse);
+    drawPanel(hintX, hintY, hintW, hintH, 4,
+      canMake ? "rgba(40,30,12,0.92)" : "rgba(20,18,14,0.78)",
+      canMake ? "rgba(220,180,60,0.6)" : "rgba(120,100,70,0.25)");
+    ctx.save();
+    // T 키 박스
+    ctx.fillStyle = "rgba(7,5,3,0.7)";
+    ctx.fillRect(hintX + 6, hintY + 5, 16, 16);
+    ctx.strokeStyle = canMake ? "rgba(220,180,60,0.6)" : "rgba(140,120,90,0.35)";
+    ctx.strokeRect(hintX + 6.5, hintY + 5.5, 15, 15);
+    ctx.fillStyle = canMake ? "rgba(232,210,140,0.95)" : "rgba(150,135,100,0.55)";
+    ctx.font = "bold 11px Georgia, serif";
+    ctx.textAlign = "center";
+    ctx.fillText(getControlCode("quickTorch").replace("Key",""), hintX + 14, hintY + 17);
+
+    ctx.fillStyle = canMake ? "rgba(228,205,150,0.92)" : "rgba(150,135,100,0.55)";
+    ctx.font = "11px Georgia, serif";
+    ctx.textAlign = "left";
+    ctx.fillText("횃불 제작", hintX + 28, hintY + 13);
+    ctx.fillStyle = canMake ? "rgba(180,160,110,0.7)" : "rgba(120,108,80,0.5)";
+    ctx.font = "10px Georgia, serif";
+    const costs = CRAFT_COSTS.torchUse;
+    const costStr = `나무${costs.wood} 석탄${costs.coal}`;
+    ctx.fillText(costStr, hintX + 28, hintY + 23);
+    ctx.restore();
+  }
 }
 
 function drawGatheringOverlay(w, h) {
@@ -4005,7 +4052,7 @@ const TT_CLOSE_BTN = { w: 60, h: 26 };
 // ── 설명 텍스트 (실제 능력 설명) ──
 const TT_DESC = {
   craftTech:            "제작_기술_설명",
-  torchUse:             "횃불_만들기_설명",
+  torchUnlock:          "횃불_해금_설명",
   torch_1:              "횃불_업그레이드_I_설명",
   torch_2:              "횃불_업그레이드_II_설명",
   torch_3:              "횃불_업그레이드_III_설명",
@@ -4029,25 +4076,75 @@ const TT_DESC = {
   sanPotion_2:          "중급_정신력_회복_포션_설명",
   sanPotion_3:          "고급_정신력_회복_포션_설명",
   ultimatePotion:       "궁극의_포션_설명",
-  manualExtractor:      "수동_원석기_설명",
+  manualExtractor:      "수정_압축기_설명",
   mysteryDevice_1:      "신비로운_수정_장치_설명",
   mysteryDevice_2:      "이상한_수정_장치_설명",
   boots_1:              "작업_장갑_설명",
   boots_2:              "석탄_장갑_설명",
   boots_3:              "광부의_장갑_설명",
-  marker_1:             "러너_부츠_설명",
-  marker_2:             "윈디_부츠_설명",
-  marker_3:             "크리스탈_부츠_설명",
+  marker_1:             "지도_보강_I_설명",
+  marker_2:             "지도_보강_II_설명",
+  shoes_1:              "러너_부츠_설명",
+  shoes_2:              "윈디_부츠_설명",
+  shoes_3:              "크리스탈_부츠_설명",
   lantern_1:            "랜턴_Lv1_설명",
   lantern_2:            "랜턴_Lv2_설명",
 };
 
+// ── 선행 조건 텍스트 (블라인드 노드 호버 시 표시) ──
+const TT_PREREQ_HINT = {
+  torchUnlock:          "제작 기술 Lv.1 필요",
+  torch_1:              "횃불 해금 필요",
+  torch_2:              "횃불 업그레이드 I 필요",
+  torch_3:              "횃불 업그레이드 II 필요",
+  marker_1:             "제작 기술 Lv.3 필요",
+  marker_2:             "지도 보강 I 필요",
+  workbench_1:          "제작 기술 Lv.2 필요",
+  workbench_2:          "제작대 Lv.1 필요",
+  workbench_3:          "제작대 Lv.2 필요",
+  lantern_1:            "제작 기술 Lv.3 필요",
+  lantern_2:            "랜턴 Lv.1 필요",
+  machineWorkbench:     "제작대 Lv.1 필요",
+  machineMax_1:         "기계 제작대 필요",
+  machineMax_2:         "기계 최대치↑ I 필요",
+  machineMax_3:         "기계 최대치↑ II 필요",
+  machineRec_1:         "기계 최대치↑ I 필요",
+  machineRec_2:         "기계 회복속도↑ I 필요",
+  manualCrafter:        "제작대 Lv.3 필요",
+  restStone:            "수동 제작기 필요",
+  restStone_2:          "안식의 돌 필요",
+  restStone_3:          "안정의 돌 필요",
+  boots_1:              "수동 제작기 필요",
+  boots_2:              "작업 장갑 필요",
+  boots_3:              "석탄 장갑 필요",
+  shoes_1:              "수동 제작기 필요",
+  shoes_2:              "러너 부츠 필요",
+  shoes_3:              "윈디 부츠 필요",
+  potionWorkbench:      "제작대 Lv.3 필요",
+  basicSanityPotion:    "포션 제작기 Lv.1 필요",
+  sanPotion_2:          "초급 정신력 포션 필요",
+  sanPotion_3:          "중급 정신력 포션 필요",
+  potionWorkbench_2:    "포션 제작기 Lv.1 필요",
+  potionWorkbench_3:    "포션 제작기 Lv.2 필요",
+  ultimatePotion:       "포션 제작기 Lv.3 필요",
+  manualExtractor:      "제작대 Lv.1 필요",
+  mysteryDevice_1:      "제작 기술 Lv.5 + 수정 압축기 필요",
+  mysteryDevice_2:      "신비로운 수정 장치 필요",
+};
+
 // ── 테크트리 노드 정의 ──
-// col: X축 위치 (같은 col 공유 불가 — 부모보다 항상 +1 이상)
-// row: Y축 위치 (같은 계열끼리 묶음)
-// prereqMet: 이 함수가 false이면 블라인드(잠금이 아니라 아예 가림)
-// craftItem: craft() 에 넘길 실제 key
-// levelKey: 설명 텍스트 key (TT_DESC)
+// col: X축 위치, row: Y축 위치
+// 레이아웃 원칙: 자식은 부모보다 col이 항상 더 큼. 같은 부모의 자식들은 다른 row.
+// row 영역 분리 (겹침 방지):
+//   row 0~1  : 횃불 / 횃불 업그레이드
+//   row 2    : 지도 (marker)
+//   row 3    : 제작 기술 메인 라인 (root)
+//   row 4    : 제작대 → 수동 제작기
+//   row 5~7  : 장갑 / 신발 / 돌 (수동 제작기 자식)
+//   row 8~9  : 포션
+//   row 10~12: 기계 제작대 + 회복속도
+//   row 13~14: 수정 압축기 → 미정 장치
+//   row 15~16: 랜턴
 
 function buildTechTree() {
   const tech  = getCraftTechLevel();
@@ -4064,180 +4161,140 @@ function buildTechTree() {
   const bsp   = getBasicSanityPotionLevel();
   const me    = getManualExtractorLevel();
   const myst  = getMysteryDeviceLevel();
+  const torchUnlocked = crafted.torchUnlocked === true;
 
   function cost(item) { return getCostForCraftItem(item); }
-
-  // state 계산: done / avail(재료 부족 포함) / locked(prereq 미충족)
-  function st(prereqOk, isMaxed, craftItem) {
+  function st(prereqOk, isMaxed) {
     if (isMaxed) return "done";
     if (!prereqOk) return "locked";
     return "avail";
   }
 
-  // 레이아웃: 이미지 기준, 선이 절대 꼬이지 않도록
-  // ─────────────────────────────────────────
-  //  col:  0      1        2         3         4          5          6
-  //  제작기술 ──► 횃불계열 ──► 횃불Upg1 ──► 횃불Upg2 ──► 횃불Upg3
-  //           └─► 제작대1 ──► 제작대2 ──► 제작대3
-  //                └──────────────────────────────► 수동제작기 ──► 안식의돌 ──► 안정의돌 ──► 영면의돌
-  //                                                            └─► 장갑1 ──► 장갑2 ──► 장갑3
-  //                                                            └─► 신발1 ──► 신발2 ──► 신발3
-  //           ├─► 랜턴1 ──► 랜턴2
-  //           ├─► 기계제작대 ──► 기계최대치1 ──► 기계최대치2 ──► 기계최대치3
-  //           │              └─► 기계회복1 ──► 기계회복2
-  //           ├─► 포션제작기1 ──► 포션제작기2 ──► 포션제작기3 ──► 궁극의포션
-  //           │              └─► 초급포션 ──► 중급포션 ──► 고급포션
-  //           └─► 수동원석기 ──► 미정장치1 ──► 미정장치2
-  // ─────────────────────────────────────────
-
   const nodes = [
-    // ── 제작 기술 (root) ──
-    { id:"craftTech", col:0, row:5,
+    // ── 제작 기술 (root, col 0) ──
+    { id:"craftTech", col:0, row:3,
       label: ["제작 기술 Lv.1","제작 기술 Lv.2","제작 기술 Lv.3","제작 기술 Lv.4","제작 기술 Lv.5"][Math.min(tech,4)],
       levelKey:"craftTech", craftItem:"craftTech",
       cost: cost("craftTech"),
       prereqMet: true,
-      state: st(true, tech >= CRAFT_COSTS.craftTech.length, "craftTech"),
+      state: st(true, tech >= CRAFT_COSTS.craftTech.length),
       cat:"base" },
 
-    // ── 횃불 계열 ──
-    { id:"torchUse", col:1, row:3,
-      label:"횃불 만들기",
-      levelKey:"torchUse", craftItem:"torchUse",
-      cost: cost("torchUse"),
+    // ── 횃불 계열 (row 0~1) ──
+    { id:"torchUnlock", col:1, row:0,
+      label:"횃불",
+      levelKey:"torchUnlock", craftItem:"torchUnlock",
+      cost: CRAFT_COSTS.torchUnlock,
       prereqMet: tech >= 1,
-      state: tech >= 1 ? "avail" : "locked",
+      state: st(tech >= 1, torchUnlocked),
       cat:"light" },
-    { id:"torch_1", col:2, row:3,
+    { id:"torch_1", col:2, row:0,
       label:"횃불 업그레이드 I",
       levelKey:"torch_1", craftItem:"torch",
       cost: CRAFT_COSTS.torch[0],
-      prereqMet: tech >= 1,
-      state: st(tech>=1, torch>=1, "torch"),
+      prereqMet: torchUnlocked,
+      state: st(torchUnlocked, torch>=1),
       cat:"light" },
-    { id:"torch_2", col:3, row:3,
+    { id:"torch_2", col:3, row:0,
       label:"횃불 업그레이드 II",
       levelKey:"torch_2", craftItem:"torch",
       cost: CRAFT_COSTS.torch[1],
-      prereqMet: tech >= 1 && torch >= 1,
-      state: st(tech>=1 && torch>=1, torch>=2, "torch"),
+      prereqMet: torchUnlocked && torch >= 1,
+      state: st(torchUnlocked && torch>=1, torch>=2),
       cat:"light" },
-    { id:"torch_3", col:4, row:3,
+    { id:"torch_3", col:4, row:0,
       label:"횃불 업그레이드 III",
       levelKey:"torch_3", craftItem:"torch",
       cost: CRAFT_COSTS.torch[2],
-      prereqMet: tech >= 1 && torch >= 2,
-      state: st(tech>=1 && torch>=2, torch>=3, "torch"),
+      prereqMet: torchUnlocked && torch >= 2,
+      state: st(torchUnlocked && torch>=2, torch>=3),
       cat:"light" },
 
-    // ── 랜턴 계열 ──
-    { id:"lantern_1", col:2, row:4,
-      label:"랜턴 Lv.1",
-      levelKey:"lantern_1", craftItem:"lantern",
-      cost: CRAFT_COSTS.lantern[0],
+    // ── 지도 보강 (row 2) — 제작 기술에서 바로 분기 ──
+    { id:"marker_1", col:1, row:2,
+      label:"지도 보강 I",
+      levelKey:"marker_1", craftItem:"marker",
+      cost: CRAFT_COSTS.marker[0],
       prereqMet: tech >= 3,
-      state: st(tech>=3, lan>=1, "lantern"),
-      cat:"light" },
-    { id:"lantern_2", col:3, row:4,
-      label:"랜턴 Lv.2",
-      levelKey:"lantern_2", craftItem:"lantern",
-      cost: CRAFT_COSTS.lantern[1],
-      prereqMet: tech >= 3 && lan >= 1,
-      state: st(tech>=3 && lan>=1, lan>=2, "lantern"),
-      cat:"light" },
+      state: st(tech>=3, marker>=1),
+      cat:"gear" },
+    { id:"marker_2", col:2, row:2,
+      label:"지도 보강 II",
+      levelKey:"marker_2", craftItem:"marker",
+      cost: CRAFT_COSTS.marker[1],
+      prereqMet: tech>=3 && marker>=1,
+      state: st(tech>=3 && marker>=1, marker>=2),
+      cat:"gear" },
 
-    // ── 제작대 계열 ──
-    { id:"workbench_1", col:1, row:5,
+    // ── 제작대 → 수동 제작기 (row 4) ──
+    { id:"workbench_1", col:1, row:4,
       label:"제작대 Lv.1",
       levelKey:"workbench_1", craftItem:"workbench",
       cost: CRAFT_COSTS.workbench[0],
       prereqMet: tech >= 2,
-      state: st(tech>=2, wb>=1, "workbench"),
+      state: st(tech>=2, wb>=1),
       cat:"base" },
-    { id:"workbench_2", col:2, row:5,
+    { id:"workbench_2", col:2, row:4,
       label:"제작대 Lv.2",
       levelKey:"workbench_2", craftItem:"workbench",
       cost: CRAFT_COSTS.workbench[1],
       prereqMet: tech>=2 && wb>=1,
-      state: st(tech>=2 && wb>=1, wb>=2, "workbench"),
+      state: st(tech>=2 && wb>=1, wb>=2),
       cat:"base" },
-    { id:"workbench_3", col:3, row:5,
+    { id:"workbench_3", col:3, row:4,
       label:"제작대 Lv.3",
       levelKey:"workbench_3", craftItem:"workbench",
       cost: CRAFT_COSTS.workbench[2],
       prereqMet: tech>=2 && wb>=2,
-      state: st(tech>=2 && wb>=2, wb>=3, "workbench"),
+      state: st(tech>=2 && wb>=2, wb>=3),
       cat:"base" },
-
-    // ── 기계 제작대 계열 ──
-    { id:"machineWorkbench", col:2, row:6,
-      label:"기계 제작대",
-      levelKey:"machineWorkbench", craftItem:"machineWorkbench",
-      cost: cost("machineWorkbench"),
-      prereqMet: wb >= 1,
-      state: st(wb>=1, crafted.machineWorkbench===true, "machineWorkbench"),
-      cat:"mach" },
-    { id:"machineMax_1", col:3, row:6,
-      label:"기계 최대치↑ I",
-      levelKey:"machineMaxUpgrade_1", craftItem:"machineMaxUpgrade",
-      cost: CRAFT_COSTS.machineMaxUpgrade[0],
-      prereqMet: crafted.machineWorkbench===true,
-      state: st(crafted.machineWorkbench===true, mchMax>=1, "machineMaxUpgrade"),
-      cat:"mach" },
-    { id:"machineMax_2", col:4, row:6,
-      label:"기계 최대치↑ II",
-      levelKey:"machineMaxUpgrade_2", craftItem:"machineMaxUpgrade",
-      cost: CRAFT_COSTS.machineMaxUpgrade[1],
-      prereqMet: crafted.machineWorkbench===true && mchMax>=1,
-      state: st(crafted.machineWorkbench===true && mchMax>=1, mchMax>=2, "machineMaxUpgrade"),
-      cat:"mach" },
-    { id:"machineMax_3", col:5, row:6,
-      label:"기계 최대치↑ III",
-      levelKey:"machineMaxUpgrade_3", craftItem:"machineMaxUpgrade",
-      cost: CRAFT_COSTS.machineMaxUpgrade[2],
-      prereqMet: crafted.machineWorkbench===true && mchMax>=2,
-      state: st(crafted.machineWorkbench===true && mchMax>=2, mchMax>=3, "machineMaxUpgrade"),
-      cat:"mach" },
-    { id:"machineRec_1", col:4, row:7,
-      label:"기계 회복속도↑ I",
-      levelKey:"machineRecovery_1", craftItem:"machineRecoveryUpgrade",
-      cost: CRAFT_COSTS.machineRecoveryUpgrade[0],
-      prereqMet: crafted.machineWorkbench===true && mchMax>=1,
-      state: st(crafted.machineWorkbench===true && mchMax>=1, mchRec>=1, "machineRecoveryUpgrade"),
-      cat:"mach" },
-    { id:"machineRec_2", col:5, row:7,
-      label:"기계 회복속도↑ II",
-      levelKey:"machineRecovery_2", craftItem:"machineRecoveryUpgrade",
-      cost: CRAFT_COSTS.machineRecoveryUpgrade[1],
-      prereqMet: crafted.machineWorkbench===true && mchMax>=1 && mchRec>=1,
-      state: st(crafted.machineWorkbench===true && mchMax>=1 && mchRec>=1, mchRec>=2, "machineRecoveryUpgrade"),
-      cat:"mach" },
-
-    // ── 수동 제작기 계열 ──
-    { id:"manualCrafter", col:4, row:5,
+    { id:"manualCrafter", col:4, row:6,
       label:"수동 제작기",
       levelKey:"manualCrafter", craftItem:"manualCrafter",
       cost: cost("manualCrafter"),
       prereqMet: wb >= 3,
-      state: st(wb>=3, mc>=1, "manualCrafter"),
+      state: st(wb>=3, mc>=1),
       cat:"base" },
 
-    // ── 돌 시리즈 ──
-    { id:"restStone", col:5, row:4,
+    // ── 장갑 시리즈 (row 5) ──
+    { id:"boots_1", col:5, row:5,
+      label:"작업 장갑",
+      levelKey:"boots_1", craftItem:"boots",
+      cost: CRAFT_COSTS.boots[0],
+      prereqMet: mc >= 1,
+      state: st(mc>=1, boots>=1),
+      cat:"gear" },
+    { id:"boots_2", col:6, row:5,
+      label:"석탄 장갑",
+      levelKey:"boots_2", craftItem:"boots",
+      cost: CRAFT_COSTS.boots[1],
+      prereqMet: mc>=1 && boots>=1,
+      state: st(mc>=1 && boots>=1, boots>=2),
+      cat:"gear" },
+    { id:"boots_3", col:7, row:5,
+      label:"광부의 장갑",
+      levelKey:"boots_3", craftItem:"boots",
+      cost: CRAFT_COSTS.boots[2],
+      prereqMet: mc>=1 && boots>=2,
+      state: st(mc>=1 && boots>=2, boots>=3),
+      cat:"gear" },
+
+    // ── 돌 시리즈 (row 6) ──
+    { id:"restStone", col:5, row:6,
       label:"안식의 돌",
       levelKey:"restStone", craftItem:"restStone",
       cost: cost("restStone"),
       prereqMet: mc >= 1,
-      state: st(mc>=1, rs>=1, "restStone"),
+      state: st(mc>=1, rs>=1),
       cat:"stone" },
-    { id:"restStone_2", col:6, row:4,
+    { id:"restStone_2", col:6, row:6,
       label:"안정의 돌",
       levelKey:"restStone_2", craftItem:null,
       cost: null,
       prereqMet: mc>=1 && rs>=1,
       state: "locked",
       cat:"stone" },
-    { id:"restStone_3", col:7, row:4,
+    { id:"restStone_3", col:7, row:6,
       label:"영면의 돌",
       levelKey:"restStone_3", craftItem:null,
       cost: null,
@@ -4245,125 +4302,147 @@ function buildTechTree() {
       state: "locked",
       cat:"stone" },
 
-    // ── 장갑 시리즈 ──
-    { id:"boots_1", col:5, row:5,
-      label:"작업 장갑",
-      levelKey:"boots_1", craftItem:"boots",
-      cost: CRAFT_COSTS.boots[0],
-      prereqMet: mc >= 1,
-      state: st(mc>=1, boots>=1, "boots"),
-      cat:"gear" },
-    { id:"boots_2", col:6, row:5,
-      label:"석탄 장갑",
-      levelKey:"boots_2", craftItem:"boots",
-      cost: CRAFT_COSTS.boots[1],
-      prereqMet: mc>=1 && boots>=1,
-      state: st(mc>=1 && boots>=1, boots>=2, "boots"),
-      cat:"gear" },
-    { id:"boots_3", col:7, row:5,
-      label:"광부의 장갑",
-      levelKey:"boots_3", craftItem:"boots",
-      cost: CRAFT_COSTS.boots[2],
-      prereqMet: mc>=1 && boots>=2,
-      state: st(mc>=1 && boots>=2, boots>=3, "boots"),
-      cat:"gear" },
-
-    // ── 신발 시리즈 ──
-    { id:"marker_1", col:5, row:6,
+    // ── 신발 시리즈 (row 7) — 미구현 placeholder ──
+    { id:"shoes_1", col:5, row:7,
       label:"러너 부츠",
-      levelKey:"marker_1", craftItem:"marker",
-      cost: CRAFT_COSTS.marker[0],
-      prereqMet: mc >= 1,
-      state: st(mc>=1, marker>=1, "marker"),
-      cat:"gear" },
-    { id:"marker_2", col:6, row:6,
-      label:"윈디 부츠",
-      levelKey:"marker_2", craftItem:"marker",
-      cost: CRAFT_COSTS.marker[1],
-      prereqMet: mc>=1 && marker>=1,
-      state: st(mc>=1 && marker>=1, marker>=2, "marker"),
-      cat:"gear" },
-    { id:"marker_3", col:7, row:6,
-      label:"크리스탈 부츠",
-      levelKey:"marker_3", craftItem:null,
+      levelKey:"shoes_1", craftItem:null,
       cost: null,
-      prereqMet: mc>=1 && marker>=2,
+      prereqMet: mc >= 1,
+      state: "locked",
+      cat:"gear" },
+    { id:"shoes_2", col:6, row:7,
+      label:"윈디 부츠",
+      levelKey:"shoes_2", craftItem:null,
+      cost: null,
+      prereqMet: false,
+      state: "locked",
+      cat:"gear" },
+    { id:"shoes_3", col:7, row:7,
+      label:"크리스탈 부츠",
+      levelKey:"shoes_3", craftItem:null,
+      cost: null,
+      prereqMet: false,
       state: "locked",
       cat:"gear" },
 
-    // ── 포션 제작기 계열 ──
+    // ── 포션 계열 (row 8~9) ──
     { id:"potionWorkbench", col:4, row:9,
       label:"포션 제작기 Lv.1",
       levelKey:"potionWorkbench", craftItem:"potionWorkbench",
       cost: cost("potionWorkbench"),
       prereqMet: wb >= 3,
-      state: st(wb>=3, pw>=1, "potionWorkbench"),
-      cat:"pot" },
-    { id:"potionWB_2", col:5, row:9,
-      label:"포션 제작기 Lv.2",
-      levelKey:"potionWorkbench_2", craftItem:null,
-      cost: null,
-      prereqMet: wb>=3 && pw>=1,
-      state: "locked",
-      cat:"pot" },
-    { id:"potionWB_3", col:6, row:9,
-      label:"포션 제작기 Lv.3",
-      levelKey:"potionWorkbench_3", craftItem:null,
-      cost: null,
-      prereqMet: wb>=3 && pw>=2,
-      state: "locked",
-      cat:"pot" },
-    { id:"ultimatePotion", col:7, row:9,
-      label:"궁극의 포션",
-      levelKey:"ultimatePotion", craftItem:null,
-      cost: null,
-      prereqMet: pw>=3,
-      state: "locked",
+      state: st(wb>=3, pw>=1),
       cat:"pot" },
     { id:"basicSanityPotion", col:5, row:8,
       label:"초급 정신력 포션",
       levelKey:"basicSanityPotion", craftItem:"basicSanityPotion",
       cost: cost("basicSanityPotion"),
       prereqMet: pw >= 1,
-      state: st(pw>=1, bsp>=1, "basicSanityPotion"),
+      state: st(pw>=1, bsp>=1),
       cat:"pot" },
     { id:"sanPotion_2", col:6, row:8,
       label:"중급 정신력 포션",
-      levelKey:"sanPotion_2", craftItem:null,
-      cost: null,
-      prereqMet: pw>=1 && bsp>=1,
-      state: "locked",
-      cat:"pot" },
+      levelKey:"sanPotion_2", craftItem:null, cost:null,
+      prereqMet: pw>=1 && bsp>=1, state:"locked", cat:"pot" },
     { id:"sanPotion_3", col:7, row:8,
       label:"고급 정신력 포션",
-      levelKey:"sanPotion_3", craftItem:null,
-      cost: null,
-      prereqMet: pw>=1 && bsp>=2,
-      state: "locked",
-      cat:"pot" },
+      levelKey:"sanPotion_3", craftItem:null, cost:null,
+      prereqMet: pw>=1 && bsp>=2, state:"locked", cat:"pot" },
+    { id:"potionWB_2", col:5, row:9,
+      label:"포션 제작기 Lv.2",
+      levelKey:"potionWorkbench_2", craftItem:null, cost:null,
+      prereqMet: pw>=1, state:"locked", cat:"pot" },
+    { id:"potionWB_3", col:6, row:9,
+      label:"포션 제작기 Lv.3",
+      levelKey:"potionWorkbench_3", craftItem:null, cost:null,
+      prereqMet: pw>=2, state:"locked", cat:"pot" },
+    { id:"ultimatePotion", col:7, row:9,
+      label:"궁극의 포션",
+      levelKey:"ultimatePotion", craftItem:null, cost:null,
+      prereqMet: pw>=3, state:"locked", cat:"pot" },
 
-    // ── 수동 원석기 + 미정 장치 ──
-    { id:"manualExtractor", col:1, row:8,
-      label:"수동 원석기",
+    // ── 기계 계열 (row 11~12) ──
+    { id:"machineWorkbench", col:2, row:11,
+      label:"기계 제작대",
+      levelKey:"machineWorkbench", craftItem:"machineWorkbench",
+      cost: cost("machineWorkbench"),
+      prereqMet: wb >= 1,
+      state: st(wb>=1, crafted.machineWorkbench===true),
+      cat:"mach" },
+    { id:"machineMax_1", col:3, row:11,
+      label:"기계 최대치↑ I",
+      levelKey:"machineMaxUpgrade_1", craftItem:"machineMaxUpgrade",
+      cost: CRAFT_COSTS.machineMaxUpgrade[0],
+      prereqMet: crafted.machineWorkbench===true,
+      state: st(crafted.machineWorkbench===true, mchMax>=1),
+      cat:"mach" },
+    { id:"machineMax_2", col:4, row:11,
+      label:"기계 최대치↑ II",
+      levelKey:"machineMaxUpgrade_2", craftItem:"machineMaxUpgrade",
+      cost: CRAFT_COSTS.machineMaxUpgrade[1],
+      prereqMet: crafted.machineWorkbench===true && mchMax>=1,
+      state: st(crafted.machineWorkbench===true && mchMax>=1, mchMax>=2),
+      cat:"mach" },
+    { id:"machineMax_3", col:5, row:11,
+      label:"기계 최대치↑ III",
+      levelKey:"machineMaxUpgrade_3", craftItem:"machineMaxUpgrade",
+      cost: CRAFT_COSTS.machineMaxUpgrade[2],
+      prereqMet: crafted.machineWorkbench===true && mchMax>=2,
+      state: st(crafted.machineWorkbench===true && mchMax>=2, mchMax>=3),
+      cat:"mach" },
+    { id:"machineRec_1", col:4, row:12,
+      label:"기계 회복속도↑ I",
+      levelKey:"machineRecovery_1", craftItem:"machineRecoveryUpgrade",
+      cost: CRAFT_COSTS.machineRecoveryUpgrade[0],
+      prereqMet: crafted.machineWorkbench===true && mchMax>=1,
+      state: st(crafted.machineWorkbench===true && mchMax>=1, mchRec>=1),
+      cat:"mach" },
+    { id:"machineRec_2", col:5, row:12,
+      label:"기계 회복속도↑ II",
+      levelKey:"machineRecovery_2", craftItem:"machineRecoveryUpgrade",
+      cost: CRAFT_COSTS.machineRecoveryUpgrade[1],
+      prereqMet: crafted.machineWorkbench===true && mchMax>=1 && mchRec>=1,
+      state: st(crafted.machineWorkbench===true && mchMax>=1 && mchRec>=1, mchRec>=2),
+      cat:"mach" },
+
+    // ── 수정 압축기 + 미정 장치 (row 14~15) ──
+    { id:"manualExtractor", col:2, row:14,
+      label:"수정 압축기",
       levelKey:"manualExtractor", craftItem:"manualExtractor",
       cost: cost("manualExtractor"),
       prereqMet: wb >= 1,
-      state: st(wb>=1, me>=1, "manualExtractor"),
+      state: st(wb>=1, me>=1),
       cat:"base" },
-    { id:"mysteryDevice_1", col:2, row:8,
+    { id:"mysteryDevice_1", col:3, row:14,
       label:"신비로운 수정 장치",
       levelKey:"mysteryDevice_1", craftItem:"mysteryDevice",
       cost: CRAFT_COSTS.mysteryDevice[0],
       prereqMet: tech>=5 && me>=1,
-      state: st(tech>=5 && me>=1, myst>=1, "mysteryDevice"),
+      state: st(tech>=5 && me>=1, myst>=1),
       cat:"base" },
-    { id:"mysteryDevice_2", col:3, row:8,
+    { id:"mysteryDevice_2", col:4, row:14,
       label:"이상한 수정 장치",
       levelKey:"mysteryDevice_2", craftItem:"mysteryDevice",
       cost: CRAFT_COSTS.mysteryDevice[1],
       prereqMet: tech>=5 && me>=1 && myst>=1,
-      state: st(tech>=5 && me>=1 && myst>=1, myst>=2, "mysteryDevice"),
+      state: st(tech>=5 && me>=1 && myst>=1, myst>=2),
       cat:"base" },
+
+    // ── 랜턴 (row 16) ──
+    { id:"lantern_1", col:1, row:16,
+      label:"랜턴 Lv.1",
+      levelKey:"lantern_1", craftItem:"lantern",
+      cost: CRAFT_COSTS.lantern[0],
+      prereqMet: tech >= 3,
+      state: st(tech>=3, lan>=1),
+      cat:"light" },
+    { id:"lantern_2", col:2, row:16,
+      label:"랜턴 Lv.2",
+      levelKey:"lantern_2", craftItem:"lantern",
+      cost: CRAFT_COSTS.lantern[1],
+      prereqMet: tech>=3 && lan>=1,
+      state: st(tech>=3 && lan>=1, lan>=2),
+      cat:"light" },
   ];
 
   // px 좌표 계산
@@ -4375,19 +4454,20 @@ function buildTechTree() {
   return nodes;
 }
 
-// ── 엣지 (from → to, 선이 꼬이지 않도록 col 오름차순 보장) ──
+// ── 엣지 (from → to, col 오름차순 보장) ──
 const TT_EDGES = [
-  // 제작 기술 → 횃불계열
-  ["craftTech","torchUse"],
-  ["craftTech","lantern_1"],
+  // 제작 기술 → 각 분기
+  ["craftTech","torchUnlock"],
+  ["craftTech","marker_1"],
   ["craftTech","workbench_1"],
   ["craftTech","manualExtractor"],
+  ["craftTech","lantern_1"],
   // 횃불
-  ["torchUse","torch_1"],
+  ["torchUnlock","torch_1"],
   ["torch_1","torch_2"],
   ["torch_2","torch_3"],
-  // 랜턴
-  ["lantern_1","lantern_2"],
+  // 지도
+  ["marker_1","marker_2"],
   // 제작대
   ["workbench_1","workbench_2"],
   ["workbench_2","workbench_3"],
@@ -4400,19 +4480,19 @@ const TT_EDGES = [
   ["machineMax_2","machineMax_3"],
   ["machineMax_1","machineRec_1"],
   ["machineRec_1","machineRec_2"],
-  // 수동 제작기 → 각 시리즈
-  ["manualCrafter","restStone"],
+  // 수동 제작기 → 장갑/돌/신발
   ["manualCrafter","boots_1"],
-  ["manualCrafter","marker_1"],
-  // 돌
-  ["restStone","restStone_2"],
-  ["restStone_2","restStone_3"],
+  ["manualCrafter","restStone"],
+  ["manualCrafter","shoes_1"],
   // 장갑
   ["boots_1","boots_2"],
   ["boots_2","boots_3"],
+  // 돌
+  ["restStone","restStone_2"],
+  ["restStone_2","restStone_3"],
   // 신발
-  ["marker_1","marker_2"],
-  ["marker_2","marker_3"],
+  ["shoes_1","shoes_2"],
+  ["shoes_2","shoes_3"],
   // 포션
   ["potionWorkbench","basicSanityPotion"],
   ["potionWorkbench","potionWB_2"],
@@ -4420,9 +4500,11 @@ const TT_EDGES = [
   ["sanPotion_2","sanPotion_3"],
   ["potionWB_2","potionWB_3"],
   ["potionWB_3","ultimatePotion"],
-  // 원석기
+  // 수정 압축기
   ["manualExtractor","mysteryDevice_1"],
   ["mysteryDevice_1","mysteryDevice_2"],
+  // 랜턴
+  ["lantern_1","lantern_2"],
 ];
 
 // ── 카테고리 색상 ──
@@ -4504,10 +4586,27 @@ function drawTechTreeNode(n, ox, oy, isHover) {
 
 // ── 툴팁 ──
 function drawTechTreeTooltip(n, ox, oy, w, h) {
-  if (!n.prereqMet) return; // 블라인드 노드는 툴팁 없음
-
   const nx = n.px + ox + TT_NW + 8;
   const ny = n.py + oy;
+
+  // 블라인드 노드용 작은 툴팁
+  if (!n.prereqMet) {
+    const hint = TT_PREREQ_HINT[n.id] || "선행 조건 미충족";
+    const tw = 190, th = 38;
+    const tx = (nx + tw > w - 10) ? (n.px + ox - tw - 8) : nx;
+    const ty = Math.max(40, Math.min(ny, h - th - 10));
+
+    drawOrnatePanel(tx, ty, tw, th, "rgba(120,100,70,0.45)");
+    ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(180,160,120,0.85)";
+    ctx.font = "bold 12px Georgia, serif";
+    ctx.fillText("???", tx+10, ty+16);
+    ctx.fillStyle = "rgba(220,180,100,0.8)";
+    ctx.font = "10px Georgia, serif";
+    ctx.fillText(hint, tx+10, ty+30);
+    return;
+  }
+
   const tw = 190, th = n.state !== "done" ? 80 : 66;
   const tx = (nx + tw > w - 10) ? (n.px + ox - tw - 8) : nx;
   const ty = Math.max(40, Math.min(ny, h - th - 10));
@@ -4676,7 +4775,6 @@ function techTreeHitNode(mx, my, nodes, ox, oy) {
   if (my < 34) return null;
   for (let i = nodes.length - 1; i >= 0; i--) {
     const n = nodes[i];
-    if (!n.prereqMet) continue; // 블라인드 노드는 클릭 불가
     const nx = n.px + ox, ny = n.py + oy;
     if (mx >= nx && mx <= nx + TT_NW && my >= ny && my <= ny + TT_NH) return n;
   }
@@ -4865,14 +4963,18 @@ window.addEventListener("keydown", (e) => {
     return;
   }
 
-  // T 키 — 횃불 빠른 제작 (제작 기술 Lv1 해금 시 사용 가능)
+  // T 키 — 횃불 빠른 제작 (횃불 해금 후 사용)
   if (matchesControl("quickTorch", e.code)) {
-    if (isCraftUnlocked("torchUse")) {
-      craft("torchUse");
-    } else if (getCraftTechLevel() < 1) {
-      showMessage("제작 기술 Lv1을 먼저 연구해야 합니다.");
-    } else {
+    if (crafted.torchUnlocked !== true) {
+      if (getCraftTechLevel() < 1) {
+        showMessage("제작 기술 Lv.1을 먼저 연구해야 합니다.");
+      } else {
+        showMessage("테크트리에서 '횃불'을 먼저 해금해야 합니다.");
+      }
+    } else if (torchPower >= getTorchMax()) {
       showMessage("횃불이 이미 가득 찼습니다.");
+    } else {
+      craft("torchUse");
     }
     return;
   }
