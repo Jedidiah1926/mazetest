@@ -458,15 +458,25 @@ function resetTechTreeState() {
 function openCraftTree() {
   showCraft = true;
   inventoryOpen = false;
-  hudCanvas.style.pointerEvents = "auto"; // 마우스 이벤트 활성화
-  if (document.pointerLockElement === canvas) document.exitPointerLock();
+  hudCanvas.style.pointerEvents = "auto";
+  // 포인터 락 해제 — 즉시도 시도하고, 핸들러가 다시 잡아도 풀리도록 함
+  if (document.pointerLockElement) {
+    try { document.exitPointerLock(); } catch {}
+  }
 }
 
 function closeCraftTree() {
   showCraft = false;
-  hudCanvas.style.pointerEvents = "none"; // 마우스 이벤트 비활성화
+  hudCanvas.style.pointerEvents = "none";
   resetTechTreeState();
 }
+
+// 포인터 락 상태 변화 감지 — 테크트리 열려있는데 락이 다시 걸리면 즉시 해제
+document.addEventListener("pointerlockchange", () => {
+  if (showCraft && document.pointerLockElement === canvas) {
+    try { document.exitPointerLock(); } catch {}
+  }
+});
 
 // ── 시각 연출 ──────────────────────────────────────────────────────────────
 let screenFade = 0;
@@ -4898,7 +4908,9 @@ window.addEventListener("mousemove", (e) => {
         techTreeScroll.x += (mx - techTreeDrag.x);
         techTreeScroll.y += (my - techTreeDrag.y);
       }
-      techTreeDrag = { x: mx, y: my, inContent: techTreeDrag.inContent };
+      // 마지막 위치만 업데이트, startX/startY는 유지
+      techTreeDrag.x = mx;
+      techTreeDrag.y = my;
       techTreeHover = null;
     } else {
       const nodes = buildTechTree();
@@ -4911,16 +4923,18 @@ window.addEventListener("mousemove", (e) => {
   }
 });
 
-hudCanvas.addEventListener("mousedown", (e) => {
+window.addEventListener("mousedown", (e) => {
   if (!showCraft) return;
+  if (e.button !== 0) return; // 왼쪽 버튼만
   const rect = hudCanvas.getBoundingClientRect();
   const scaleX = hudCanvas.width / rect.width;
   const scaleY = hudCanvas.height / rect.height;
   const mx = (e.clientX - rect.left) * scaleX;
   const my = (e.clientY - rect.top) * scaleY;
   // 헤더(34px) 아래에서만 드래그 스크롤
-  techTreeDrag = { x: mx, y: my, inContent: my > 34 };
+  techTreeDrag = { x: mx, y: my, inContent: my > 34, startX: mx, startY: my };
   e.preventDefault();
+  e.stopPropagation();
 });
 
 window.addEventListener("mouseup", (e) => {
@@ -4930,7 +4944,7 @@ window.addEventListener("mouseup", (e) => {
   const scaleY = hudCanvas.height / rect.height;
   const mx = (e.clientX - rect.left) * scaleX;
   const my = (e.clientY - rect.top) * scaleY;
-  const dist = Math.abs(mx - techTreeDrag.x) + Math.abs(my - techTreeDrag.y);
+  const dist = Math.abs(mx - techTreeDrag.startX) + Math.abs(my - techTreeDrag.startY);
   const wasContent = techTreeDrag.inContent;
   techTreeDrag = null;
 
@@ -4953,11 +4967,15 @@ window.addEventListener("mouseup", (e) => {
   hudCanvas.style.cursor = "default";
 });
 
-canvas.addEventListener("click", () => {
+canvas.addEventListener("click", (e) => {
   if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
-  if (showCraft || mapOpen || inventoryOpen) return;
+  if (showCraft || mapOpen || inventoryOpen) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
   requestGamePointerLock();
-});
+}, true); // capture phase로 먼저 처리
 
 loadSettings();
 loadProgress();
