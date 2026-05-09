@@ -4870,6 +4870,11 @@ window.addEventListener("keyup", (e) => {
 
 window.addEventListener("mousemove", (e) => {
   if (document.pointerLockElement === canvas) {
+    if (showCraft) {
+      // 테크트리 열려있으면 포인터 락 즉시 해제
+      document.exitPointerLock();
+      return;
+    }
     mouse.dx += e.movementX;
     mouse.dy += e.movementY;
     return;
@@ -4947,6 +4952,7 @@ window.addEventListener("mouseup", (e) => {
 
 canvas.addEventListener("click", () => {
   if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+  if (showCraft || mapOpen || inventoryOpen) return;
   requestGamePointerLock();
 });
 
